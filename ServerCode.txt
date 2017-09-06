@@ -8,12 +8,11 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.sql.*;
 
-public class Main {
+class Main {
     public static void main(String[] args) {
         new MyServer();
     }
 }
-
 
 
 class MyServer {
@@ -21,17 +20,14 @@ class MyServer {
     ArrayList<String> clientnick;
     ServerSocket server = null;
 
-    //конструктор для создание сервера
     public MyServer() {
 
         SQLHandler.connect();
         Socket s;
-        //создаем список клиентов
+
         client = new ArrayList<>();
-        //создаем список ников клиентов для обновления списка активных пользователей чата
         clientnick = new ArrayList<>();
         try {
-            //определяем сокет для соединения клинта и сервера
             server = new ServerSocket(8189);
             while (true){
 
@@ -54,12 +50,11 @@ class MyServer {
 
         }
     }
-    //метод возвращает клиента
     public synchronized ArrayList<ClientHandler> getClient() {
         return client;
     }
 
-    //метод для отправки сообщения определенному участнику чата
+
     public synchronized void sendPersonalMessage(String nick, String message){
         for(ClientHandler ch : client){
             if(ch.getName().equals(nick)){
@@ -69,7 +64,7 @@ class MyServer {
         }
     }
 
-    //метод определяющий занят ли никнейм
+   
     public synchronized boolean isNickBusy(String nick){
         for (ClientHandler clientHandler: client) {
              if (clientHandler.getName().equals(nick)){
@@ -79,10 +74,9 @@ class MyServer {
         return false;
     }
 
-    //метод для добавления пользователя в список клиентов, а также обновление списка активных пользователей
     public synchronized void addClient(ClientHandler clientHandler){
         client.add(clientHandler);
-        broadCastMsg(clientHandler.getName() + " вошел в чат");
+        broadCastMsg(clientHandler.getName() + " enter in chat");
         ArrayList<String> listuserArr = getClientnick();
         String listUser = "";
         for (String x: listuserArr) {
@@ -93,13 +87,13 @@ class MyServer {
         }
     }
 
-    //метод для добавления нового никнейма при регистрации в общий список никнеймов
+    
     public synchronized void addClientnick(String nick){
         clientnick.add(nick);
 
     }
 
-    //метод для отправки сообщений всем участникам чата с указанием времени
+   
     public synchronized void broadCastMsg(String msg){
         String str = new SimpleDateFormat("HH:mm:ss").format(Calendar.getInstance().getTime());
         msg =  str + " " + msg;
@@ -109,10 +103,10 @@ class MyServer {
         }
     }
 
-    //метод для удаления пользователя из списка клиентов, а также обновление списка активных пользователей
+    
     public synchronized void removeClient(ClientHandler clientHandler){
         client.remove(clientHandler);
-        broadCastMsg(clientHandler.getName() + " вышел из чата");
+        broadCastMsg(clientHandler.getName() + " left chat");
         ArrayList<String> listuserArr = getClientnick();
         String listUser = "";
         for (String x: listuserArr) {
@@ -124,18 +118,18 @@ class MyServer {
 
     }
 
-    //метод для удаления никнейма из общего списка никнеймов
+    
     public synchronized void removeClientuser(String user){
         int numberuser = clientnick.indexOf(user);
         clientnick.remove(numberuser);
     }
 
-    //метод для получения списка никнеймов
+    
     public synchronized ArrayList<String> getClientnick() {
         return clientnick;
     }
 
-    //метод переименовывает никнейм, обновляется общий список никнеймов, а также обновление списка активных пользователей
+    
     public synchronized void renameClientuser(String nick, String oldnick){
         int numberuser = clientnick.indexOf(oldnick);
         clientnick.remove(numberuser);
@@ -162,15 +156,13 @@ class ClientHandler implements Runnable {
     private String name;
     private MyServer owner;
 
-    //конструктор для общения сервера и клиента
+    
     public ClientHandler(Socket s, MyServer owner) {
         this.s = s;
         name = "";
         this.owner = owner;
         try {
-            //входящий поток сообщений
             in = new DataInputStream(s.getInputStream());
-            //изходящий поток сообщений
             out = new DataOutputStream(s.getOutputStream());
         } catch (IOException e) {
             e.printStackTrace();
@@ -178,45 +170,37 @@ class ClientHandler implements Runnable {
 
     }
 
-    //метод для получения никнейма
     public String getName() {
         return name;
     }
 
-    //установка никнейма
     public void setName(String name) {
         this.name = name;
     }
 
-
-    //метод для запуска потока
     @Override
     public void run() {
         try {
             while (true) {
 
                 String str = null;
-                //получение входящего сообщения от клиента
                 str = in.readUTF();
 
-                //поключение к серверу
                 if (str != null && name.isEmpty()) {
                     String[] arr = str.split("\\s");
                     if (arr.length == 3) {
-                        //получение никнейма для пользователя
+                        
                         if (arr[0].equals("/auth")) {
                             String login = arr[1];
                             String pass = arr[2];
                             String nick = SQLHandler.getNickByLoginAndPassword(login, pass);
                             if (nick != null) {
                                 synchronized (owner.getClient()) {
-                                    //если никнейм не занят, то пользователь авторизируется,клиент и никнейм добавляется в общий список клиентов и никнеймов,
                                     if (!owner.isNickBusy(nick)) {
                                         name = nick;
                                         sendMsg("/yes " + getName());
                                         owner.addClientnick(nick);
                                         owner.addClient(this);
-                                        //для обновление активного списка клиентов на панели чата
                                         ArrayList<String> listuserArr = owner.getClientnick();
                                         String listUser = "";
                                         for (String x: listuserArr) {
@@ -226,52 +210,41 @@ class ClientHandler implements Runnable {
                                         sendMsg("/listuser" + listUser);
                                         continue;
                                     } else {
-                                        //отправляется сообщение клиенту что пользователь уже авторизирован
                                         sendMsg("NickBusy");
                                     }
                                 }
                             } else if (nick == null) {
-                                //если никнейм не найден, то отправляется сообщение "Неправильно введен логин или пароль"
                                 sendMsg("stop");
                             }
 
                         }
                     } else if (arr.length == 4) {
-                        //регистрация нового пользователя в чате
                         if (arr[0].equals("/reg")) {
                             String newlogin = arr[1];
                             String newpass = arr[2];
                             String newnick = arr[3];
-                            //проверка на существование логина в БД
                             if (SQLHandler.isWrongLogin(newlogin)) {
                                 sendMsg("StopUser");
-                            //проверка на существование никнейма в БД
                             } else if (SQLHandler.isWrongNick(newnick)) {
                                 sendMsg("StopNick");
-                            //регистрация нового пользователя, если нет повторяющихся логина и никнейма
                             } else if (!SQLHandler.isWrongLogin(newlogin) & !SQLHandler.isWrongNick(newnick)) {
                                 SQLHandler.addEntry(newlogin, newpass, newnick);
                             }
                         }
                     }
                 }
-                //отправка сообщений
                 if (str != null) {
-                    //отправка служебных сообщений
                     if (str.startsWith("/")) {
-                        //выход из клиента в окно авторизации
                         if (str.equals("/end")) break;
-                        //отправить сообщение определенному пользователю чата
                         if (str.startsWith("/pm")) {
                             String[] w = str.split("\\s");
                             String nick = w[1];
                             String msg = str.substring(w[0].length() + w[1].length() + 2);
                             if (!getName().equals(nick)) {
-                                owner.sendPersonalMessage(nick, "Сообщение от " + getName() + ": " + msg);
-                                sendMsg(getName() + " отправил " + nick + " : " + msg);
+                                owner.sendPersonalMessage(nick, "Message от " + getName() + ": " + msg);
+                                sendMsg(getName() + " send " + nick + " : " + msg);
                             }
                         }
-                        //поменять никнейм пользователю
                         if (str.startsWith("/changenick")) {
                             String[] w = str.split("\\s");
                             String nick = w[1];
@@ -279,7 +252,7 @@ class ClientHandler implements Runnable {
                             owner.renameClientuser(nick,oldnick);
                             SQLHandler.changeNick(nick, oldnick);
                             setName(nick);
-                            owner.broadCastMsg(oldnick + " поменял на " + nick);
+                            owner.broadCastMsg(oldnick + " change on " + nick);
                         }
                         continue;
                     }
@@ -298,10 +271,8 @@ class ClientHandler implements Runnable {
         } catch (IOException e) {
             e.printStackTrace();
         } finally {
-            //при отключении клиента удаляются из клиенты из списка клиентов и никнеймов из списка никнеймов
             owner.removeClientuser(getName());
             owner.removeClient(this);
-            //обновление активного списка пользователей в окне чата
             ArrayList<String> listuserArr = owner.getClientnick();
             String listUser = "";
             for (String x: listuserArr) {
@@ -316,7 +287,6 @@ class ClientHandler implements Runnable {
         }
     }
 
-    //метод для отправки сообщений клиенту
     public void sendMsg(String msg) {
 
         try {
@@ -335,27 +305,24 @@ class SQLHandler {
     private static PreparedStatement pr;
     public static void connect(){
         try {
-            //подключение к базе данных
             Class.forName("org.sqlite.JDBC");
             cn = DriverManager.getConnection("jdbc:sqlite:forChat.db");
-            System.out.println("База подключена!");
+            System.out.println("Base connect!");
         } catch (Exception e) {
             e.printStackTrace();
         }
 
     }
-    //метод отключения от базы данных
     public static void disconnect(){
         try {
         if (cn!=null && !cn.isClosed())
             cn.close();
-            System.out.println("База отключена");
+            System.out.println("Base disconnect");
         } catch (SQLException e) {
             e.printStackTrace();
         }
     }
 
-    //метод проверяющий логин и пароль при подключении к серверу
     public static String getNickByLoginAndPassword(String login, String password){
         ResultSet rs;
         String str = null;
@@ -374,7 +341,6 @@ class SQLHandler {
         return str;
     }
 
-    //метод меняющий в БД никнейм
     public static void changeNick(String newNick, String oldNick){
         try {
             pr = cn.prepareStatement("UPDATE Main SET nickname = ? WHERE nickname = ?;");
@@ -387,7 +353,6 @@ class SQLHandler {
 
     }
 
-    //метод регистрирующий нового пользователя, добавление в БД
     public static void addEntry(String login, String pass, String nick){
         try {
             pr = cn.prepareStatement("INSERT INTO Main(login, password,nickname) VALUES (?,?,?);");
@@ -401,7 +366,6 @@ class SQLHandler {
 
     }
 
-    // метод проверяющий логин
     public static boolean isWrongLogin(String login) {
         ResultSet rs;
         String str = null;
@@ -423,7 +387,6 @@ class SQLHandler {
         return false;
     }
 
-    // метод проверяющий никнейм
     public static boolean isWrongNick(String nick) {
         ResultSet rs;
         String str = null;
